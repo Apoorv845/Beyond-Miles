@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  /* This creates your custom Tailwind classes (e.g., bg-forest-green, text-sand-tone) */
+  --color-forest-green: #2C4C3B;
+  --color-warm-white: #F9F6F0;
+  --color-sand-tone: #D4C4B7;
+  --color-charcoal-accent: #333333;
+  --color-earth-brown: #8B5A2B;
+}
+
+/* This applies your brand colors as the default background and text for the whole site */
+body {
+  background-color: var(--color-warm-white);
+  color: var(--color-charcoal-accent);
+  -webkit-font-smoothing: antialiased;
+}
