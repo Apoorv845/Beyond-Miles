@@ -1,155 +1,164 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { supabase } from "../../lib/supabase";
-import { useRouter } from "next/navigation";
-import { premiumDestinations, Destination } from "../../lib/destinations";
-import "leaflet/dist/leaflet.css";
+import { useState } from "react";
+import Link from "next/link";
 
 export default function Dashboard() {
-  const router = useRouter();
-  const [userName, setUserName] = useState<string>("Traveler");
-  const [loading, setLoading] = useState(true);
-  const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
-  
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  // Interactive State for the Calculator
+  const [travelers, setTravelers] = useState(2);
+  const [days, setDays] = useState(5);
+  const [tier, setTier] = useState("Premium");
 
-  useEffect(() => {
-    async function getUserProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/register");
-        return;
-      }
-      const { data } = await supabase
-        .from("profiles")
-        .select("first_name")
-        .eq("id", user.id)
-        .single();
+  // Dynamic Calculation Logic
+  const getBaseRate = () => (tier === "Premium" ? 15000 : 35000);
+  const totalEstimate = travelers * days * getBaseRate();
 
-      if (data?.first_name) {
-        setUserName(data.first_name);
-      }
-      setLoading(false);
+  // Mock Suggested Packages
+  const suggestions = [
+    {
+      id: 1,
+      title: "The Oberoi Vanyavilas",
+      location: "Ranthambore",
+      tier: "Ultra-Luxury",
+      image: "https://images.unsplash.com/photo-1549366021-9f761d450615?auto=format&fit=crop&w=600&q=80",
+    },
+    {
+      id: 2,
+      title: "Taj Lake Palace",
+      location: "Udaipur",
+      tier: "Premium",
+      image: "https://images.unsplash.com/photo-1598977123418-45f04b6144bc?auto=format&fit=crop&w=600&q=80",
+    },
+    {
+      id: 3,
+      title: "Wildflower Hall",
+      location: "Shimla",
+      tier: "Premium",
+      image: "https://images.unsplash.com/photo-1545208597-3f9903c55047?auto=format&fit=crop&w=600&q=80",
     }
-    getUserProfile();
-  }, [router]);
+  ];
 
-  useEffect(() => {
-    if (loading || !mapContainerRef.current || mapRef.current) return;
-
-    async function initMap() {
-      const L = (await import("leaflet")).default;
-
-      // Reset default asset paths for standard markers
-      // @ts-ignore
-      delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-      });
-
-      // Init map centered on India
-      mapRef.current = L.map(mapContainerRef.current!).setView([22.5937, 78.9629], 5);
-
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-      }).addTo(mapRef.current);
-
-      // Add pins to map dynamically from destinations list
-      premiumDestinations.forEach((dest) => {
-        const marker = L.marker(dest.coordinates)
-          .addTo(mapRef.current)
-          .bindPopup(`<b>${dest.title}</b><br/>${dest.region}`);
-        
-        markersRef.current.push({ id: dest.id, markerInstance: marker });
-      });
-    }
-
-    initMap();
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markersRef.current = [];
-      }
-    };
-  }, [loading]);
-
-  // Function to pan the map over to a specific spot when a sidebar card is clicked
-  const handleSelectLocation = (dest: Destination) => {
-    setSelectedDest(dest);
-    if (mapRef.current) {
-      mapRef.current.setView(dest.coordinates, 8, { animate: true, duration: 1.5 });
-      
-      // Open the corresponding map popup programmatically
-      const found = markersRef.current.find(m => m.id === dest.id);
-      if (found) {
-        found.markerInstance.openPopup();
-      }
-    }
-  };
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-warm-white text-forest-green font-serif text-xl">Loading your personalized escape...</div>;
-  }
+  // Filter recommendations based on user's selected tier
+  const filteredSuggestions = suggestions.filter(pkg => pkg.tier === tier || tier === "Ultra-Luxury");
 
   return (
-    <main className="h-screen w-full flex flex-col md:flex-row bg-warm-white overflow-hidden">
-      
-      {/* Sidebar Panel */}
-      <div className="w-full md:w-1/3 lg:w-1/4 p-6 flex flex-col z-1000white/90 backdrop-blur-md shadow-2xl border-r border-sand-tone/30 overflow-y-auto">
-        <h1 className="text-3xl font-serif text-forest-green mb-1">Welcome, {userName}.</h1>
-        <p className="text-xs text-charcoal-accent/60 mb-6">
-          Handpicked boutique routes crafted unique to premium discovery standards.
-        </p>
-        
-        {/* Destination Cards Container */}
-        <div className="grow e-y-3">
-          <p className="text-xs font-semibold tracking-widest text-sand-tone uppercase mb-2">Curated for you</p>
-          
-          {premiumDestinations.map((dest) => (
-            <div 
-              key={dest.id}
-              onClick={() => handleSelectLocation(dest)}
-              className={`p-4 border rounded-xl cursor-pointer transition-all ${
-                selectedDest?.id === dest.id 
-                  ? "border-forest-green bg-forest-green/5 shadow-md" 
-                  : "border-sand-tone/30 hover:border-sand-tone bg-white"
-              }`}
-            >
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="font-serif font-medium text-forest-green text-base">{dest.title}</h3>
-                <span className="text-[10px] bg-sand-tone/20 text-charcoal-accent/80 px-2 py-0.5 rounded-full uppercase tracking-wider font-medium">
-                  {dest.landscape}
-                </span>
-              </div>
-              <p className="text-xs text-charcoal-accent/50 mb-1">{dest.region}</p>
-              <p className="text-xs text-charcoal-accent/80 line-clamp-2">{dest.description}</p>
-            </div>
-          ))}
+    <div className="min-h-screen bg-[#FDFBF7] text-[#1C352D] font-sans pb-12">
+      {/* HEADER */}
+      <header className="bg-[#1C352D] text-white py-6 px-8 shadow-md">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <Link href="/" className="text-2xl font-serif tracking-widest font-bold">BEYOND MILES</Link>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-[#C5A880] tracking-wider uppercase font-semibold">Welcome Back</span>
+            <Link href="/" className="text-xs bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-all">Sign Out</Link>
+          </div>
         </div>
+      </header>
 
-        <button 
-          onClick={async () => {
-            await supabase.auth.signOut();
-            router.push("/register");
-          }}
-          className="mt-6 py-2.5 w-full text-xs font-medium tracking-wide text-charcoal-accent/60 hover:text-charcoal-accent border border-sand-tone/50 rounded-full transition-colors cursor-pointer"
-        >
-          Sign Out
-        </button>
-      </div>
+      <main className="max-w-7xl mx-auto px-6 py-10 flex flex-col lg:flex-row gap-10">
+        
+        {/* LEFT PANEL: INTERACTIVE CALCULATOR */}
+        <section className="w-full lg:w-1/3">
+          <div className="bg-white p-8 rounded-3xl shadow-lg border border-[#1C352D]/10 sticky top-10">
+            <h2 className="text-2xl font-serif mb-6">Trip Estimator</h2>
+            
+            {/* Travelers Slider */}
+            <div className="mb-8">
+              <div className="flex justify-between items-end mb-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#1C352D]/60">Travelers</label>
+                <span className="text-xl font-serif text-[#C5A880]">{travelers} {travelers === 1 ? 'Person' : 'People'}</span>
+              </div>
+              <input 
+                type="range" min="1" max="10" value={travelers} 
+                onChange={(e) => setTravelers(parseInt(e.target.value))}
+                className="w-full accent-[#1C352D]"
+              />
+            </div>
 
-      {/* Map Area */}
-      <div ref={mapContainerRef} className="grow not-even:ll w-full z-0" />
+            {/* Days Slider */}
+            <div className="mb-8">
+              <div className="flex justify-between items-end mb-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#1C352D]/60">Duration</label>
+                <span className="text-xl font-serif text-[#C5A880]">{days} Days</span>
+              </div>
+              <input 
+                type="range" min="2" max="21" value={days} 
+                onChange={(e) => setDays(parseInt(e.target.value))}
+                className="w-full accent-[#1C352D]"
+              />
+            </div>
 
-    </main>
+            {/* Luxury Tier Selection */}
+            <div className="mb-10">
+              <label className="text-xs font-bold uppercase tracking-wider text-[#1C352D]/60 block mb-3">Experience Tier</label>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setTier("Premium")}
+                  className={`flex-grow py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${tier === "Premium" ? "bg-[#1C352D] text-white" : "bg-gray-100 text-[#1C352D]/60 hover:bg-gray-200"}`}
+                >
+                  Premium
+                </button>
+                <button 
+                  onClick={() => setTier("Ultra-Luxury")}
+                  className={`flex-grow py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${tier === "Ultra-Luxury" ? "bg-[#C5A880] text-white shadow-md" : "bg-gray-100 text-[#1C352D]/60 hover:bg-gray-200"}`}
+                >
+                  Ultra-Luxury
+                </button>
+              </div>
+            </div>
+
+            {/* Live Estimate Result */}
+            <div className="bg-[#1C352D]/5 p-6 rounded-2xl border border-[#1C352D]/10 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#1C352D]/60 mb-1">Estimated Budget</p>
+              <h3 className="text-4xl font-serif text-[#1C352D] mb-2">
+                ₹{totalEstimate.toLocaleString('en-IN')}
+              </h3>
+              <p className="text-xs text-[#1C352D]/50 font-medium">Excluding international flights & taxes</p>
+            </div>
+            
+            <button className="w-full mt-6 py-4 bg-[#1C352D] text-white rounded-xl text-sm font-semibold uppercase tracking-wider shadow-lg hover:bg-[#1C352D]/90 transition-all">
+              Save Itinerary Profile
+            </button>
+          </div>
+        </section>
+
+        {/* RIGHT PANEL: SMART RECOMMENDATIONS */}
+        <section className="w-full lg:w-2/3">
+          <div className="mb-8 border-b border-[#1C352D]/10 pb-4">
+            <h1 className="text-3xl font-serif">Tailored For You</h1>
+            <p className="text-sm text-[#1C352D]/60 mt-2">Based on a {days}-day journey for {travelers} seeking {tier} experiences.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredSuggestions.map((pkg) => (
+              <div key={pkg.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-[#1C352D]/10 transition-all group cursor-pointer">
+                <div className="h-48 w-full overflow-hidden relative">
+                  <img src={pkg.image} alt={pkg.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" />
+                  <span className="absolute top-3 left-3 bg-[#1C352D] text-white px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded-md">
+                    {pkg.tier} Match
+                  </span>
+                </div>
+                <div className="p-5">
+                  <h4 className="text-xl font-serif text-[#1C352D] mb-1">{pkg.title}</h4>
+                  <p className="text-xs font-bold text-[#C5A880] uppercase tracking-wider mb-4">📍 {pkg.location}</p>
+                  <Link href="/packages" className="inline-block text-xs font-bold border-b border-[#1C352D] text-[#1C352D] pb-1 hover:text-[#C5A880] hover:border-[#C5A880] transition-colors">
+                    Explore Details &rarr;
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-10 p-8 bg-[#1C352D] text-white rounded-3xl text-center relative overflow-hidden">
+             <div className="absolute top-[-50%] right-[-10%] w-[60%] h-[200%] bg-[#C5A880]/20 blur-3xl rotate-45 pointer-events-none" />
+             <h3 className="text-2xl font-serif mb-3 relative z-10">Need a custom route?</h3>
+             <p className="text-sm text-white/70 max-w-md mx-auto mb-6 relative z-10">Our luxury concierges are ready to draft a bespoke itinerary matching your exact calculated metrics.</p>
+             <button className="px-8 py-3 bg-[#C5A880] text-white rounded-full text-xs font-bold uppercase tracking-wider hover:bg-[#B3966E] transition-all relative z-10">
+               Contact Concierge
+             </button>
+          </div>
+
+        </section>
+      </main>
+    </div>
   );
 }
